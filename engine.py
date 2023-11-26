@@ -11,6 +11,7 @@
 Train and eval functions used in main.py
 """
 import math
+
 import os
 import sys
 from typing import Iterable
@@ -121,10 +122,12 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
 
         orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
         results = postprocessors['bbox'](outputs, orig_target_sizes)
+
         if 'segm' in postprocessors.keys():
             target_sizes = torch.stack([t["size"] for t in targets], dim=0)
             results = postprocessors['segm'](results, outputs, orig_target_sizes, target_sizes)
         res = {target['image_id'].item(): output for target, output in zip(targets, results)}
+
         if coco_evaluator is not None:
             coco_evaluator.update(res)
 
@@ -144,7 +147,7 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
     if coco_evaluator is not None:
         coco_evaluator.synchronize_between_processes()
     if panoptic_evaluator is not None:
-        panoptic_evaluator.synchronize_between_processes()
+        panoptic_evaluator.synchronize_wetween_processes()
 
     # accumulate predictions from all images
     if coco_evaluator is not None:

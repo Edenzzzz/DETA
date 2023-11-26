@@ -9,7 +9,7 @@
 
 import torch.utils.data
 from .torchvision_datasets import CocoDetection
-
+from datasets.data_prefetcher import SDEvalDataset
 from .coco import build as build_coco
 
 
@@ -31,3 +31,11 @@ def build_dataset(image_set, args):
         from .coco_panoptic import build as build_coco_panoptic
         return build_coco_panoptic(image_set, args)
     raise ValueError(f'dataset {args.dataset_file} not supported')
+
+
+def build_sd_dataset(path):
+    from datasets.coco import make_coco_transforms
+    transforms = make_coco_transforms(image_set="val", bigger=False)
+    dataset = SDEvalDataset(path, transforms)
+    
+    return dataset

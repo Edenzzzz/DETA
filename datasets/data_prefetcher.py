@@ -5,10 +5,18 @@
 # ------------------------------------------------------------------------
 
 import torch
+import os
+from PIL import Image
+
+def img_loader(path):
+    return Image.open(path)
 
 def to_cuda(samples, targets, device):
     samples = samples.to(device, non_blocking=True)
-    targets = [{k: v.to(device, non_blocking=True) for k, v in t.items()} for t in targets]
+    targets = [{k: v.to(device, non_blocking=True) if isinstance(v, torch.Tensor) else v for k, v in t.items()}
+    for t in targets
+]
+
     return samples, targets
 
 class data_prefetcher():
@@ -58,7 +66,8 @@ class data_prefetcher():
             if targets is not None:
                 for t in targets:
                     for k, v in t.items():
-                        v.record_stream(torch.cuda.current_stream())
+                        if isinstance(v, torch.Tensor):
+                            v.record_stream(torch.cuda.current_stream())
             self.preload()
         else:
             try:
@@ -68,3 +77,58 @@ class data_prefetcher():
                 samples = None
                 targets = None
         return samples, targets
+
+class SDEvalDataset(torch.utils.data.Dataset):
+    def __init__(self, path, transforms=None):
+        """
+        Args:
+            path (str): path to the folder of images
+        """
+        #model version subfolder
+        if len(os.listdir(path)) == 1 and os.path.isdir(os.path.join(path, os.listdir(path)[0])):
+            path = os.path.join(path, os.listdir(path)[0])
+        
+        self.path = path
+        self.img_names = [name for name in os.listdir(path) 
+                     if name.endswith('.jpg') or name.endswith('.png')]
+        self.img_paths = [os.path.join(path, name) for name in self.img_names]
+        self.num_samples = len(self.img_names)
+        assert os.path.isdir(self.path) and self.num_samples > 0, "No images found in {}".format(path)
+        
+        #get objects and attributes from prompts
+        prompts = [name.split('-')[-1].split(".")[0] for name in self.img_names]
+        #e.g. 00000-0-a black airplane.jpg
+        extracted = [self._get_objects(prompt) for prompt in prompts]
+
+        self.objects = [part[0] for part in extracted]
+        self.attr = [part[1] for part in extracted]
+        self.transforms = transforms
+        self.dummy_target = torch.tensor(1)
+
+    def __getitem__(self, idx):
+        samples = img_loader(self.img_paths[idx])
+        samples.save("../fresh_sample!.jpg")
+        targets = {"objects": self.objects[idx], "attr": self.attr[idx], "img_path": self.img_paths[idx]}
+        if self.transforms:
+            samples, targets = self.transforms(samples, targets)
+        return samples, targets
+    
+    
+    def __len__(self):
+        return self.num_samples
+    
+
+    def _get_objects(self, prompt):
+        #e.g. a black cat and a brown bird and a purple car and a black truck
+        words = prompt.split(' ')
+        
+        objects = []
+        attr = []  #attributes (adjectives)
+        index = -2
+        while (index < len(words) - 4):
+            index += 4
+            objects.append(words[index])
+            attr.append(words[index - 1])
+        
+        return objects, attr
+            

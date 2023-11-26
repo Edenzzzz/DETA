@@ -31,7 +31,7 @@ class CocoEvaluator(object):
     def __init__(self, coco_gt, iou_types):
         assert isinstance(iou_types, (list, tuple))
         coco_gt = copy.deepcopy(coco_gt)
-        self.coco_gt = coco_gt
+        self.coco_gt = coco_gt #get all (91)classes: coco_gt.cats
 
         self.iou_types = iou_types
         self.coco_eval = {}
